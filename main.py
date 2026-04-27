@@ -5,12 +5,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import SessionLocal, engine
 import models, schemas
 
-# создать таблицы
+# Создание таблиц: SQLAlchemy проверяет наличие таблиц в БД и создает их, если их нет
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# CORS
+# Настройка CORS: позволяет фронтенду взаимодействовать с бэкендом, даже если они на разных доменах
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# DB session
+# Функция получения сессии БД: открывает соединение и гарантированно закрывает его после запроса
 def get_db():
     db = SessionLocal()
     try:
@@ -31,6 +31,7 @@ def get_db():
 
 @app.post("/register")
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    # Регистрация: сохраняем email и пароль нового пользователя
     new_user = models.User(
         email=user.email,
         password=user.password
@@ -41,6 +42,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/login")
 def login(user: dict, db: Session = Depends(get_db)):
+    # Логин: поиск пользователя в базе и простая проверка совпадения пароля
     db_user = db.query(models.User).filter(models.User.email == user.get("email")).first()
 
     if not db_user:
@@ -55,6 +57,7 @@ def login(user: dict, db: Session = Depends(get_db)):
 
 @app.post("/report")
 def create_report(report: schemas.ReportCreate, db: Session = Depends(get_db)):
+    # Создание заявки: записываем координаты и описание, ставим начальный статус "pending"
     new_report = models.Report(
         title=report.title,
         description=report.description,
@@ -73,12 +76,14 @@ def create_report(report: schemas.ReportCreate, db: Session = Depends(get_db)):
 
 @app.get("/reports")
 def get_reports(db: Session = Depends(get_db)):
+    # Получение списка: возвращает все найденные в базе заявки
     return db.query(models.Report).all()
 
 # ================= UPDATE STATUS =================
 
 @app.put("/report/{report_id}")
 def update_status(report_id: int, status_update: schemas.StatusUpdate, db: Session = Depends(get_db)):
+    # Обновление: находим заявку по ID и меняем её текущий статус
     report = db.query(models.Report).filter(models.Report.id == report_id).first()
 
     if not report:
@@ -96,6 +101,7 @@ def update_status(report_id: int, status_update: schemas.StatusUpdate, db: Sessi
 
 @app.delete("/report/{report_id}")
 def delete_report(report_id: int, db: Session = Depends(get_db)):
+    # Удаление: находим запись и полностью стираем её из базы данных
     report = db.query(models.Report).filter(models.Report.id == report_id).first()
 
     if not report:
@@ -110,6 +116,7 @@ def delete_report(report_id: int, db: Session = Depends(get_db)):
 
 @app.get("/stats")
 def get_stats(db: Session = Depends(get_db)):
+    # Статистика: считаем количество строк в таблице для каждого типа статуса
     total = db.query(models.Report).count()
     pending = db.query(models.Report).filter(models.Report.status == "pending").count()
     in_progress = db.query(models.Report).filter(models.Report.status == "in_progress").count()
